@@ -1,4 +1,4 @@
-Computer-Graphis-Project
+Computer-Graphics-Project
 ========================
 
 optional
