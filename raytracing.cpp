@@ -26,12 +26,6 @@ void init()
 	MyLightPositions.push_back(MyCameraPosition);
 }
 
-//return the color of your pixel.
-Vec3Df performRayTracing(const Vec3Df & origin, const Vec3Df & dest)
-{
-	return Vec3Df(dest[0],dest[1],dest[2]);
-}
-
 //return the depth of the triangle
 float triangleCollisionDistance(const Vec3Df & origin, const Vec3Df & dest, const Triangle & triangle)
 {
