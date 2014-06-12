@@ -32,6 +32,29 @@ Vec3Df performRayTracing(const Vec3Df & origin, const Vec3Df & dest)
 	return Vec3Df(dest[0],dest[1],dest[2]);
 }
 
+//return the depth of the triangle
+float triangleCollisionDistance(const Vec3Df & origin, const Vec3Df & dest, const Triangle & triangle)
+{
+    return 1;
+}
+
+//return the color of your pixel.
+Vec3Df performRayTracing(const Vec3Df & origin, const Vec3Df & dest)
+{
+    float distance = (origin - dest).getLength();
+    Triangle triangle;
+    
+    for(int i = 0; i < MyMesh.triangles.size(); i ++){
+        float collision = triangleCollisionDistance(origin, dest, MyMesh.triangles[i]);
+        if (collision < distance){
+            distance = collision;
+            triangle = MyMesh.triangles[i];
+        }
+    }
+    
+	return Vec3Df(dest[0],dest[1],dest[2]);
+}
+
 
 void yourDebugDraw()
 {
