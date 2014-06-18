@@ -17,7 +17,8 @@ void init()
 	//feel free to replace cube by a path to another model
 	//please realize that not all OBJ files will successfully load.
 	//Nonetheless, if they come from Blender, they should.
-    MyMesh.loadMesh("cube.obj", true);
+    MyMesh.loadMesh("both.obj", true);
+    //MyMesh.loadMesh("cube", true);
 	MyMesh.computeVertexNormals();
 
 	//one first move: initialize the first light source
