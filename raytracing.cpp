@@ -29,7 +29,13 @@ void init()
 //return the depth of the triangle
 float triangleCollisionDistance(const Vec3Df & origin, const Vec3Df & dest, const Triangle & triangle)
 {
-    return 1;
+    Vec3Df normal = triangle.computeVertexNormals();
+    //printf("normal: %f", normal);
+    
+    Vec3Df v0 = triangle[0];
+    float D = vecDot(N, v0);
+    //std::cout" normal: "<<normal<<"!"<<std::endl;
+    return -(dot(normal, origin) + D) / dot(normal, dest);
 }
 
 //return the color of your pixel.
@@ -46,7 +52,7 @@ Vec3Df performRayTracing(const Vec3Df & origin, const Vec3Df & dest)
         }
     }
     
-	return Vec3Df(dest[0],dest[1],dest[2]);
+	return Vec3Df(triangle[0],triangle[1],triangle[2]);
 }
 
 
