@@ -17,7 +17,7 @@ void init()
 	//feel free to replace cube by a path to another model
 	//please realize that not all OBJ files will successfully load.
 	//Nonetheless, if they come from Blender, they should.
-    MyMesh.loadMesh("dodgeColorTest.obj", true);
+    MyMesh.loadMesh("cube.obj", true);
 	MyMesh.computeVertexNormals();
 
 	//one first move: initialize the first light source
@@ -32,9 +32,9 @@ float triangleCollisionDistance(const Vec3Df & origin, const Vec3Df & dest, cons
     
     //printf("normal: %f", normal);
     
-    Vec3Df v0 = Mesh::vertices[triangle.v[0]].p;
-    Vec3Df v1 = Mesh::vertices[triangle.v[1]].p;
-    Vec3Df v2 = Mesh::vertices[triangle.v[2]].p;
+    Vec3Df v0 = MyMesh.vertices[triangle.v[0]].p;
+    Vec3Df v1 = MyMesh.vertices[triangle.v[1]].p;
+    Vec3Df v2 = MyMesh.vertices[triangle.v[2]].p;
     Vec3Df v01 = v1 - v0;
     Vec3Df v02 = v2 - v0;
     Vec3Df normal = Vec3Df::crossProduct(v01,v02);
