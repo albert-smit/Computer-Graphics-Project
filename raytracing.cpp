@@ -47,7 +47,7 @@ void init()
 	//feel free to replace cube by a path to another model
 	//please realize that not all OBJ files will successfully load.
 	//Nonetheless, if they come from Blender, they should.
-    MyMesh.loadMesh("C:/Users/Vlad/Desktop/raytracing/sphere.obj", true);
+    MyMesh.loadMesh("C:/Users/Vlad/Desktop/raytracing/shadowtest.obj", true);
 	MyMesh.computeVertexNormals();
 
 	//one first move: initialize the first light source
@@ -75,8 +75,10 @@ void init()
 	(v)[1] * (q)[1] + \
 	(v)[2] * (q)[2])
 
+//check if a ray intersects a triangle, 
+//intersect returns the intersection point
 float rayIntersectsTriangle(const float *p, const float *d,
-	const float *v0, const float *v1, const float *v2) {
+	const float *v0, const float *v1, const float *v2, Vec3Df* intersect) {
 
 	float e1[3], e2[3], h[3], s[3], q[3];
 	float a, f, u, v;
@@ -86,7 +88,8 @@ float rayIntersectsTriangle(const float *p, const float *d,
 	crossProduct0(h, d, e2);
 	a = innerProduct(e1, h);
 
-	if (a > -0.00001 && a < 0.00001)
+	//if (a > -0.00001 && a < 0.00001)
+	if (a == 0)
 		return(-1);
 
 	f = 1 / a;
@@ -104,10 +107,14 @@ float rayIntersectsTriangle(const float *p, const float *d,
 
 	// at this stage we can compute t to find out where
 	// the intersection point is on the line
-	float t = f * innerProduct(e2, q);
+	float t = f * innerProduct(e2, q);  
 
-	if (t > 0.00001) // ray intersection
+	if (t > 0) // ray intersection
+	{
+
+		*intersect = (1 - u - v)*Vec3Df(v0[0], v0[1], v0[2]) + u*Vec3Df(v1[0], v1[1], v1[2]) + v*Vec3Df(v2[0], v2[1], v2[2]); // intersect point of ray and triangle
 		return(t);
+	}
 
 	else // this means that there is a line intersection
 		// but not a ray intersection
@@ -115,47 +122,50 @@ float rayIntersectsTriangle(const float *p, const float *d,
 
 }
 
-//check if a point is shaded i.e. no direct light (FIX PLS)
-bool shadow(Vec3Df ray, int j)
+
+
+//check if a point is shaded i.e. no direct light
+bool shadow(Vec3Df origin, Vec3Df dest)
 {
-	//origin
-	const float *p = ray.p;
-	//destination
-	const float *d = MyLightPositions[j].p;
 
-	//loop through all triangles in search for intersection
+	Vec3Df intersect;
+	
+	float *p = origin.p;
+	float *d = dest.p;
+
 	for (int i = 0; i < MyMesh.triangles.size(); i++){
-		const float *v0 = MyMesh.vertices[MyMesh.triangles[i].v[0]].p.p;
-		const float *v1 = MyMesh.vertices[MyMesh.triangles[i].v[1]].p.p;
-		const float *v2 = MyMesh.vertices[MyMesh.triangles[i].v[2]].p.p;
+		float *v0 = MyMesh.vertices[MyMesh.triangles[i].v[0]].p.p;
+		float *v1 = MyMesh.vertices[MyMesh.triangles[i].v[1]].p.p;
+		float *v2 = MyMesh.vertices[MyMesh.triangles[i].v[2]].p.p;
 
-		float t = rayIntersectsTriangle(p, d, v0, v1, v2);
+		float t = rayIntersectsTriangle(p, d, v0, v1, v2, &intersect);
 
-		//if intersected, return true
-		if (t > 0.00001)
+		//intesect means above 0, rest is to filter out noise
+		if (t > 0.001)
 		{
 			return true;
 		}
+
 	}
+
 	return false;
+
 
 }
 
+//called when ray from origin intersects a triangle
 //function that gets the colour
 Vec3Df getTriangleColour(int i, Vec3Df ray)
 {
-
 	Vec3Df result = Vec3Df(0, 0, 0);
+
+	Vec3Df vertexPos = ray;
 
 	//make the normal
 	Vec3Df edge01 = MyMesh.vertices[MyMesh.triangles[i].v[1]].p - MyMesh.vertices[MyMesh.triangles[i].v[0]].p;
 	Vec3Df edge02 = MyMesh.vertices[MyMesh.triangles[i].v[2]].p - MyMesh.vertices[MyMesh.triangles[i].v[0]].p;
-	Vec3Df n = Vec3Df::crossProduct(edge01, edge02);
-	n.normalize();
-
-	Vec3Df normal = n; //Vec3Df(MyMesh.vertices[MyMesh.triangles[i].v[j]].n[0], MyMesh.vertices[MyMesh.triangles[i].v[j]].n[1], MyMesh.vertices[MyMesh.triangles[i].v[j]].n[2]);
-
-	Vec3Df vertexPos = ray; //MyMesh.vertices[MyMesh.triangles[i].v[1]].p;
+	Vec3Df normal = Vec3Df::crossProduct(edge01, edge02);
+	normal.normalize();
 
 	//light vector
 	Vec3Df lightvector;
@@ -166,7 +176,7 @@ Vec3Df getTriangleColour(int i, Vec3Df ray)
 	//"halfway" vector, see wiki page for blinn-phong
 	Vec3Df H;
 
-	//exponent value
+	//exponent value for blinn
 	float s = 2;
 
 	float dotprodblinn = 0;
@@ -198,49 +208,36 @@ Vec3Df getTriangleColour(int i, Vec3Df ray)
 			dotprodblinn2 = pow(dotprodblinn2, s);
 		}
 
-		//for diffuse
-		float dotprod2 = Vec3Df::dotProduct(normal, lightvector);
+		//diffuse
+		float dotproddiff2 = Vec3Df::dotProduct(normal, lightvector);
 
-		if (dotprod2 < 0)
+		if (dotproddiff2 < 0)
 		{
 			//this might need to change
-			dotprod2 = 0.01;
+			dotproddiff2 = 0.01;
 		}
 
+		Vec3Df result2 = Vec3Df(0, 0, 0);
+
+		//get colour of material
+		unsigned int triMat = MyMesh.triangleMaterials.at(i);
+		Vec3Df col = MyMesh.materials.at(triMat).Kd() * 0.5;
+
+		//add blinn-phong and diffuse
+		result2 += col * dotproddiff2;
+		result2 += col * dotprodblinn2;
+		
 		//check for shadow
-		/*bool shaded = shadow(ray, j);
+		bool shaded = shadow(ray, MyLightPositions[j]);
 		if (shaded)
 		{
-			dotprodblinn2 = 0;
-			dotprod2 = 0;
-		}*/
-
-		//if brighter than last light, update
-		if (dotprodblinn2 > dotprodblinn)
-		{
-			dotprodblinn = dotprodblinn2;
+			float shadowdepth = 0.2;
+			result2 *= shadowdepth;
 		}
 
-		//if brighter than last light, update
-		if (dotprod2 > dotproddiff)
-		{
-			dotproddiff = dotprod2;
-		}
-
-
+		result += result2; 
 	}
-	//material colour
-	unsigned int triMat = MyMesh.triangleMaterials.at(i);
-	Vec3Df col = MyMesh.materials.at(triMat).Kd();
 
-	//diffuse
-	result += col * dotproddiff;
-	//Vec3Df diff = col * dotprod;
-
-	//blinn
-	result += col * dotprodblinn;
-	//Vec3Df blinn = col * dotprodblinn;
-	
 	return result;
 }
 
@@ -308,15 +305,15 @@ public:
 };
 
 
-
+//the main function here
 //return the color of your pixel.
 Vec3Df performRayTracing(const Vec3Df & origin, const Vec3Df & dest)
 {
-	//create ray and box
+	//create ray and bounding box
 	Ray<float> ray1(origin, dest);
 	Box3<float> box(bmin, bmax);
 
-	//if the ray doesn't intersect the box, return colour (default black, change to something else for debugging)
+	//if the ray doesn't intersect the box, return colour (default black, change to something else for debugging bounding box)
 	if (!(box.intersect(ray1)))
 	{
 		return Vec3Df(0, 0, 0);
@@ -325,37 +322,39 @@ Vec3Df performRayTracing(const Vec3Df & origin, const Vec3Df & dest)
 	//initialise to far, this float determines closest distance to origin
 	float mindistance = 10000;
 
+	//index of triangle in mesh
 	int triangleind = -1;
 
-	//used to get vertexPos, a precise location on triangle
+	//used to get vertexPos, intersection point on triangle
 	Vec3Df ray;
+
+	Vec3Df intersect;
 
 	const float *p = origin.p;
 	const float *d = dest.p;
 
 	//find closest triangle by looping through all
 	for (int i = 0; i < MyMesh.triangles.size(); i++){
-		const float *v0 = MyMesh.vertices[MyMesh.triangles[i].v[0]].p.p;
-		const float *v1 = MyMesh.vertices[MyMesh.triangles[i].v[1]].p.p;
-		const float *v2 = MyMesh.vertices[MyMesh.triangles[i].v[2]].p.p;
 
-		float t = rayIntersectsTriangle( p, d, v0, v1, v2);
+		float *v0 = MyMesh.vertices[MyMesh.triangles[i].v[0]].p.p;
+		float *v1 = MyMesh.vertices[MyMesh.triangles[i].v[1]].p.p;
+		float *v2 = MyMesh.vertices[MyMesh.triangles[i].v[2]].p.p;
 
-		//t < 0 means behind camera
-		if (t > 0)
+		float t = rayIntersectsTriangle(p, d, v0, v1, v2, &intersect);
+
+		//t < 0 means no intersect
+		if (t >= 0)
 		{
 			//closest triangle
 			if (mindistance > t)
 			{
-				ray = dest - origin;
-				ray.normalize();
-				ray *= t;
-				ray += origin;
+				ray = intersect;
 				mindistance = t;
 				triangleind = i;
 			}
 		}
 	}
+	
 
 	//if there was an intersection with a triangle
 	if (triangleind >= 0)
