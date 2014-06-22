@@ -47,7 +47,7 @@ void init()
 	//feel free to replace cube by a path to another model
 	//please realize that not all OBJ files will successfully load.
 	//Nonetheless, if they come from Blender, they should.
-    MyMesh.loadMesh("C:/Users/Vlad/Desktop/raytracing/shadowtest.obj", true);
+    MyMesh.loadMesh("shadowtest.obj", true);
 	MyMesh.computeVertexNormals();
 
 	//one first move: initialize the first light source
@@ -234,6 +234,15 @@ Vec3Df getTriangleColour(int i, Vec3Df ray)
 			float shadowdepth = 0.2;
 			result2 *= shadowdepth;
 		}
+        
+        //if (Vec3Df::dotProduct(ray,normal) > 0) {
+        //    Vec3Df r = ray - 2 * Vec3Df::dotProduct(normal, ray) * normal;
+        //    r.normalize();
+        //
+        //   result2 += MyMesh.materials.at(triMat).Ks() * pow(Vec3Df::dotProduct(ray,r), s);
+        //
+        //}
+
 
 		result += result2; 
 	}
