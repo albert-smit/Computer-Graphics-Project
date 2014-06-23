@@ -21,6 +21,13 @@ Vec3Df testRayDestination;
 Vec3Df bmin;
 Vec3Df bmax;
 
+//Turn features on/off
+const bool shadowFlag = true;
+const bool reflectionFlag = true;
+const bool refractionFlag = true;
+const bool blinnPhongFlag = true;
+const bool diffuseFlag = true;
+
 void boundingBox()
 {
 	//initialise variables to something reasonable
@@ -54,7 +61,7 @@ void init()
 	//feel free to replace cube by a path to another model
 	//please realize that not all OBJ files will successfully load.
 	//Nonetheless, if they come from Blender, they should.
-    MyMesh.loadMesh("reflection.obj", true);
+	MyMesh.loadMesh("objects/coloredCube.obj", true);
 	MyMesh.computeVertexNormals();
 
 	//one first move: initialize the first light source
@@ -114,7 +121,7 @@ float rayIntersectsTriangle(const float *p, const float *d,
 
 	// at this stage we can compute t to find out where
 	// the intersection point is on the line
-	float t = f * innerProduct(e2, q);  
+	float t = f * innerProduct(e2, q);
 
 	if (t > 0) // ray intersection
 	{
@@ -135,7 +142,7 @@ bool shadow(Vec3Df origin, Vec3Df dest)
 {
 
 	Vec3Df intersect;
-	
+
 	float *p = origin.p;
 	float *d = dest.p;
 
@@ -146,8 +153,8 @@ bool shadow(Vec3Df origin, Vec3Df dest)
 
 		float t = rayIntersectsTriangle(p, d, v0, v1, v2, &intersect);
 
-		//intesect means above 0, rest is to filter out noise
-		if (t > 0.001)
+		//intersect means above 0, rest is to filter out noise
+		if (t > 0.0001)
 		{
 			return true;
 		}
@@ -155,15 +162,81 @@ bool shadow(Vec3Df origin, Vec3Df dest)
 	}
 
 	return false;
+}
 
+float getBlinnPhong(Vec3Df normal, Vec3Df H, float exp) {
+	//blinn-phong = N dot H
+	float blinnPhong = Vec3Df::dotProduct(normal, H);
 
+	//clamp to zero
+	if (blinnPhong < 0)
+	{
+		blinnPhong = 0;
+	}
+	else
+	{
+		//add exponent to equation
+		blinnPhong = pow(blinnPhong, exp);
+	}
+
+	return blinnPhong;
+}
+
+float getDiffusion(Vec3Df normal, Vec3Df lightvector) {
+	float diffusion = Vec3Df::dotProduct(normal, lightvector);
+
+	if (diffusion < 0)
+	{
+		//this might need to change
+		diffusion = 0.1;
+	}
+
+	return diffusion;
+}
+
+Vec3Df getRefraction(Vec3Df normal, Vec3Df ray, Vec3Df vertexPos) {
+	Vec3Df result = Vec3Df(0, 0, 0);
+
+	//variable to check if the light goes in or out the transparent object
+	float inOut = Vec3Df::dotProduct(normal, ray);
+
+	//when inOut < 0 the light goes into the sphere
+	if (inOut < 0){
+
+		//the fraction coefficient for glass
+		float fractionCoGlass = 0.66;
+
+		//calculate the the ray inside the object
+		float dotPro = Vec3Df::dotProduct(normal, -vertexPos);
+		float partUnderRoot = sqrtf(1 - fractionCoGlass * fractionCoGlass * (1 - dotPro*dotPro));
+		if (partUnderRoot > 0){
+			Vec3Df RayInside = (fractionCoGlass * dotPro - partUnderRoot) * normal - (fractionCoGlass * -ray);
+		}
+		// else the light goes out the sphere
+	}
+	else{
+
+		//the fraction coefficient for glass
+		float fractionCoGlass = 0.66;
+
+		//calculate the the ray inside the object
+		float dotPro = Vec3Df::dotProduct(-normal, -ray);
+		float partUnderRoot = sqrtf(1 - fractionCoGlass * fractionCoGlass * (1 - dotPro*dotPro));
+		if (partUnderRoot > 0){
+			Vec3Df RayOutside = (fractionCoGlass * dotPro - partUnderRoot) * normal - (fractionCoGlass * -ray);
+		}
+	}
+	// end refraction
+
+	return result;
 }
 
 //function that gets the colour of reflection ray
 //essentially a copy of getTriangleColour without reflections
-Vec3Df getReflectionColour(int triangleind, Vec3Df ray, Vec3Df origin, int lightnum, Vec3Df brightness)
+Vec3Df getReflectionColour(int triangleind, Vec3Df ray, Vec3Df origin, int currentLightPos, Vec3Df brightness)
 {
 	Vec3Df result = Vec3Df(0, 0, 0);
+	Vec3Df result2 = Vec3Df(0, 0, 0);
 
 	Vec3Df vertexPos = ray;
 
@@ -186,10 +259,10 @@ Vec3Df getReflectionColour(int triangleind, Vec3Df ray, Vec3Df origin, int light
 	unsigned int triMat = MyMesh.triangleMaterials.at(triangleind);
 	Vec3Df col = MyMesh.materials.at(triMat).Kd() * 0.5;
 
-	//exponent value for blinn
-	float s = 2;
+	float blinnPhongResult = 0;
+	float diffuseResult = 0;
 
-	lightvector = MyLightPositions[lightnum] - vertexPos;
+	lightvector = MyLightPositions[currentLightPos] - vertexPos;
 	lightvector.normalize();
 
 	cameravector = origin - vertexPos;
@@ -198,42 +271,30 @@ Vec3Df getReflectionColour(int triangleind, Vec3Df ray, Vec3Df origin, int light
 	H = lightvector + cameravector;
 	H.normalize();
 
-	//blinn-phong = N dot H
-	float dotprodblinn2 = Vec3Df::dotProduct(normal, H);
+	// Add Blinn-Phong effect
+	if (blinnPhongFlag) {
+		blinnPhongResult = getBlinnPhong(normal, H, 2);
 
-	//clamp to zero
-	if (dotprodblinn2 < 0)
-	{
-		dotprodblinn2 = 0;
-	}
-	else
-	{
-		//add exponent to equation
-		dotprodblinn2 = pow(dotprodblinn2, s);
+		result2 += col * blinnPhongResult;
 	}
 
-	//diffuse
-	float dotproddiff2 = Vec3Df::dotProduct(normal, lightvector);
+	// Add diffuse effect
+	if (diffuseFlag) {
+		diffuseResult = getDiffusion(normal, lightvector);
 
-	//clamp
-	if (dotproddiff2 < 0)
-	{
-		//this might need to change
-		dotproddiff2 = 0.01;
+		result2 += col * diffuseResult;
 	}
 
-	Vec3Df result2 = Vec3Df(0, 0, 0);
-
-	//add blinn-phong and diffuse
-	result2 += col * dotproddiff2;
-	result2 += col * dotprodblinn2;
 
 	//check for shadow
-	bool shaded = shadow(ray, MyLightPositions[lightnum]);
-	if (shaded)
-	{
-		float shadowdepth = 0.2;
-		result2 *= shadowdepth;
+	if (shadowFlag) {
+		bool shaded = shadow(ray, MyLightPositions[currentLightPos]);
+		if (shaded)
+		{
+			float shadowdepth = 0.2;
+
+			result2 *= shadowdepth;
+		}
 	}
 
 	result += result2;
@@ -241,11 +302,75 @@ Vec3Df getReflectionColour(int triangleind, Vec3Df ray, Vec3Df origin, int light
 	return result;
 }
 
+Vec3Df getReflection(Vec3Df cameraPos, Vec3Df selectedPos, Vec3Df normal, int currentLightPos, Vec3Df currentResult) {
+	Vec3Df reflectionColour = Vec3Df(0, 0, 0);
+	//"camera" vector to origin
+	Vec3Df V = cameraPos - selectedPos;
+	V.normalize();
+
+	float cosalpha = Vec3Df::dotProduct(V, normal);
+
+	//FOR REFLECTION
+	//if "camera" is on wrong side of surface (normal pointing other way, over 90 degrees) then cosalpha < 0
+	if (cosalpha > 0) {
+		Vec3Df r = ((2 * cosalpha) * normal) - V;
+		r.normalize();
+
+		//this will be the intersection point of reflection vector
+		Vec3Df intersect;
+		float mindistance = 10000;
+		int triangleind = -1;
+
+		Vec3Df reflray;
+
+		const float *p = selectedPos.p;
+		const float *d = r.p;
+
+		//find closest triangle by looping through all
+		for (int o = 0; o < MyMesh.triangles.size(); o++){
+
+			float *v0 = MyMesh.vertices[MyMesh.triangles[o].v[0]].p.p;
+			float *v1 = MyMesh.vertices[MyMesh.triangles[o].v[1]].p.p;
+			float *v2 = MyMesh.vertices[MyMesh.triangles[o].v[2]].p.p;
+
+			float t = rayIntersectsTriangle(p, d, v0, v1, v2, &intersect);
+
+			//t < 0 means no intersect
+			//0.0001 because slight noise filtering
+			if (t > 0.0001)
+			{
+				//closest triangle
+				if (mindistance > t)
+				{
+					reflray = intersect;
+					mindistance = t;
+					triangleind = o;
+				}
+			}
+
+
+		}
+
+		//if there was an intersection with a triangle
+		if (triangleind >= 0)
+		{
+			reflectionColour = getReflectionColour(triangleind, intersect, reflray, currentLightPos, currentResult);
+
+			////get colour of material
+			unsigned int triMatr = MyMesh.triangleMaterials.at(triangleind);
+			Vec3Df colr = MyMesh.materials.at(triMatr).Ks() * 0.1;
+		}
+
+	}//end of the reflection part
+	return reflectionColour;
+}
+
 //called when ray from origin intersects a triangle
 //function that gets the colour
 Vec3Df getTriangleColour(int i, Vec3Df ray, Vec3Df origin)
 {
 	Vec3Df result = Vec3Df(0, 0, 0);
+	Vec3Df result2 = Vec3Df(0, 0, 0);
 
 	Vec3Df vertexPos = ray;
 
@@ -268,8 +393,12 @@ Vec3Df getTriangleColour(int i, Vec3Df ray, Vec3Df origin)
 	unsigned int triMat = MyMesh.triangleMaterials.at(i);
 	Vec3Df col = MyMesh.materials.at(triMat).Kd() * 0.5;
 
-	//exponent value for blinn
-	float s = 2;
+	float blinnPhongResult = 0;
+	float diffuseResult = 0;
+	Vec3Df reflectionResult = Vec3Df(0, 0, 0);
+	Vec3Df refractionResult = Vec3Df(0, 0, 0);
+
+
 
 	//iterate through each light source
 	for (int j = 0; j < MyLightPositions.size(); j++)
@@ -283,140 +412,47 @@ Vec3Df getTriangleColour(int i, Vec3Df ray, Vec3Df origin)
 		H = lightvector + cameravector;
 		H.normalize();
 
-		//blinn-phong = N dot H
-		float dotprodblinn2 = Vec3Df::dotProduct(normal, H);
+		// Add Blinn-Phong effect
+		if (blinnPhongFlag) {
+			blinnPhongResult = getBlinnPhong(normal, H, 2);
 
-		//clamp to zero
-		if (dotprodblinn2 < 0)
-		{
-			dotprodblinn2 = 0;
-		}
-		else
-		{
-			//add exponent to equation
-			dotprodblinn2 = pow(dotprodblinn2, s);
+			result2 += col * blinnPhongResult;
 		}
 
-		//diffuse
-		float dotproddiff2 = Vec3Df::dotProduct(normal, lightvector);
+		// Add diffuse effect
+		if (diffuseFlag) {
+			diffuseResult = getDiffusion(normal, lightvector);
 
-		if (dotproddiff2 < 0)
-		{
-			//this might need to change
-			dotproddiff2 = 0.1;
+			result2 += col * diffuseResult;
 		}
 
-		Vec3Df result2 = Vec3Df(0, 0, 0);
 
-		//add blinn-phong and diffuse
-		result2 += col * dotproddiff2;
-		result2 += col * dotprodblinn2;
-		
 		//check for shadow
-		bool shaded = shadow(ray, MyLightPositions[j]);
-		if (shaded)
-		{
-			float shadowdepth = 0.2;
-			result2 *= shadowdepth;
+		if (shadowFlag) {
+			bool shaded = shadow(ray, MyLightPositions[j]);
+			if (shaded)
+			{
+				float shadowdepth = 0.2;
+
+				result2 *= shadowdepth;
+			}
 		}
 
 
-		Vec3Df cameraPos = origin;
-		Vec3Df selectedPos = ray;
-		//"camera" vector to origin
-		Vec3Df V = cameraPos - selectedPos;
-		V.normalize();
+		if (reflectionFlag) {
+			reflectionResult = getReflection(origin, ray, normal, j, result2);
 
-		float cosalpha = Vec3Df::dotProduct(V, normal);
+			result2 += reflectionResult;
+		}
 
-		//FOR REFLECTION
-		//if "camera" is on wrong side of surface (normal pointing other way, over 90 degrees) then cosalpha < 0
-		if (cosalpha > 0) {
-			Vec3Df r = ((2 * cosalpha) * normal) - V;
-			r.normalize();
-
-			//this will be the intersection point of reflection vector
-			Vec3Df intersect;
-			float mindistance = 10000;
-			int triangleind = -1;
-
-			Vec3Df reflray;
-
-			const float *p = ray.p;
-			const float *d = r.p;
-
-			//find closest triangle by looping through all
-			for (int o = 0; o < MyMesh.triangles.size(); o++){
-
-				float *v0 = MyMesh.vertices[MyMesh.triangles[o].v[0]].p.p;
-				float *v1 = MyMesh.vertices[MyMesh.triangles[o].v[1]].p.p;
-				float *v2 = MyMesh.vertices[MyMesh.triangles[o].v[2]].p.p;
-
-				float t = rayIntersectsTriangle(p, d, v0, v1, v2, &intersect);
-
-				//t < 0 means no intersect
-				//0.0001 because slight noise filtering
-				if (t > 0.0001)
-				{
-					//closest triangle
-					if (mindistance > t)
-					{
-						reflray = intersect;
-						mindistance = t;
-						triangleind = o;
-					}
-				}
+		//refraction for transparent objects
+		if (refractionFlag) {
+			refractionResult = getRefraction(normal, ray, vertexPos);
+		}
 
 
-			}
 
-			//if there was an intersection with a triangle
-			if (triangleind >= 0)
-			{
-				Vec3Df reflcol = getReflectionColour(triangleind, intersect, reflray, j, result2);
-
-				////get colour of material
-				unsigned int triMatr = MyMesh.triangleMaterials.at(triangleind);
-				Vec3Df colr = MyMesh.materials.at(triMatr).Ks() * 0.1;
-
-				//should be += but currently = for debugging purposes
-				result2 += reflcol;
-			}
-			
-		}//end of the reflection part
-        
-        //refraction for transparent objects
-            
-        //variable to check if the light goes in or out the transparent object
-        float inOut = Vec3Df::dotProduct(normal, ray);
-            
-        //when inOut < 0 the light goes into the sphere
-        if(inOut < 0){
-            
-            //the fraction coefficient for glass
-            float fractionCoGlass = 0.66;
-                
-            //calculate the the ray inside the object
-            float dotPro = Vec3Df::dotProduct(normal, -vertexPos);
-            float partUnderRoot = sqrtf(1-fractionCoGlass * fractionCoGlass * (1-dotPro*dotPro));
-            if(partUnderRoot > 0){
-                Vec3Df RayInside = (fractionCoGlass * dotPro - partUnderRoot) * normal - (fractionCoGlass * -ray);
-            }
-            // else the light goes out the sphere
-        }else{
-            
-            //the fraction coefficient for glass
-            float fractionCoGlass = 0.66;
-            
-            //calculate the the ray inside the object
-            float dotPro = Vec3Df::dotProduct(-normal, -ray);
-            float partUnderRoot = sqrtf(1-fractionCoGlass * fractionCoGlass * (1-dotPro*dotPro));
-            if(partUnderRoot > 0){
-                Vec3Df RayOutside = (fractionCoGlass * dotPro - partUnderRoot) * normal - (fractionCoGlass * -ray);
-            }
-        // end refraction
-
-		result += result2; 
+		result += result2;
 	}
 
 	return result;
@@ -447,14 +483,14 @@ public:
 };
 
 //bounding box
-class Box 
-{ 
-public: 
+class Box
+{
+public:
 	Box(Vec3D<float> vmin, Vec3D<float> vmax)
-	{ 
-		bounds[0] = vmin; 
-		bounds[1] = vmax; 
-	} 
+	{
+		bounds[0] = vmin;
+		bounds[1] = vmax;
+	}
 	Vec3D<float> bounds[2];
 
 	bool intersect(const Ray &r) const {
@@ -463,24 +499,24 @@ public:
 		tmax = (bounds[1 - r.sign[0]][0] - r.orig[0]) * r.invdir[0];
 		tymin = (bounds[r.sign[1]][1] - r.orig[1]) * r.invdir[1];
 		tymax = (bounds[1 - r.sign[1]][1] - r.orig[1]) * r.invdir[1];
-		if ((tmin > tymax) || (tymin > tmax)) 
+		if ((tmin > tymax) || (tymin > tmax))
 			return false;
-		if (tymin > tmin) 
-			tmin = tymin; 
-		if (tymax < tmax) 
+		if (tymin > tmin)
+			tmin = tymin;
+		if (tymax < tmax)
 			tmax = tymax;
-		tzmin = (bounds[r.sign[2]][2] - r.orig[2]) * r.invdir[2]; 
-		tzmax = (bounds[1 - r.sign[2]][2] - r.orig[2]) * r.invdir[2]; 
-		if ((tmin > tzmax) || (tzmin > tmax)) 
-			return false; 
-		if (tzmin > tmin) 
-			tmin = tzmin; 
-		if (tzmax < tmax) 
-			tmax = tzmax; 
+		tzmin = (bounds[r.sign[2]][2] - r.orig[2]) * r.invdir[2];
+		tzmax = (bounds[1 - r.sign[2]][2] - r.orig[2]) * r.invdir[2];
+		if ((tmin > tzmax) || (tzmin > tmax))
+			return false;
+		if (tzmin > tmin)
+			tmin = tzmin;
+		if (tzmax < tmax)
+			tmax = tzmax;
 		if (tmin > r.tmin)
-			r.tmin = tmin; 
-		if (tmax < r.tmax) 
-			r.tmax = tmax; 
+			r.tmin = tmin;
+		if (tmax < r.tmax)
+			r.tmax = tmax;
 		return true;
 	}
 };
@@ -535,7 +571,7 @@ Vec3Df performRayTracing(const Vec3Df & origin, const Vec3Df & dest)
 			}
 		}
 	}
-	
+
 
 	//if there was an intersection with a triangle
 	if (triangleind >= 0)
@@ -556,7 +592,7 @@ void yourDebugDraw()
 	//as an example: 
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	glDisable(GL_LIGHTING);
-	glColor3f(0,1,1);
+	glColor3f(0, 1, 1);
 	glBegin(GL_LINES);
 	glVertex3f(testRayOrigin[0], testRayOrigin[1], testRayOrigin[2]);
 	glVertex3f(testRayDestination[0], testRayDestination[1], testRayDestination[2]);
@@ -577,5 +613,5 @@ void yourKeyboardFunc(char t, int x, int y)
 	//here I use it to get the coordinates of a ray, which I then draw in the debug function.
 	produceRay(x, y, testRayOrigin, testRayDestination);
 
-	std::cout<<t<<" pressed! The mouse was in location "<<x<<","<<y<<"!"<<std::endl;
+	std::cout << t << " pressed! The mouse was in location " << x << "," << y << "!" << std::endl;
 }
