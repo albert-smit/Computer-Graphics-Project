@@ -2,7 +2,13 @@
 #include <windows.h>
 #endif
 #include <stdlib.h>
+#ifdef __APPLE__
+#include <GLUT/glut.h>
+#include <OpenGL/gl.h>
+#else
 #include <GL/glut.h>
+#include <GL/gl.h>
+#endif
 #include <math.h>
 #include <assert.h>
 #include "raytracing.h"
