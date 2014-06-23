@@ -3,7 +3,13 @@
 #include <windows.h>
 #endif
 #include <stdlib.h>
+#ifdef __APPLE__
+#include <GLUT/glut.h>
+#include <OpenGL/gl.h>
+#else
 #include <GL/glut.h>
+#include <GL/gl.h>
+#endif
 #include <stdio.h>
 #include <string.h>
 #include <math.h>

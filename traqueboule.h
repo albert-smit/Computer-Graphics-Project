@@ -8,7 +8,13 @@ Utilitaires pour appliquer une traqueboule a une fenetre OpenGL.
 #ifdef WIN32
 #include <windows.h>
 #endif
+#ifdef __APPLE__
+#include <GLUT/glut.h>
+#include <OpenGL/gl.h>
+#else
 #include <GL/glut.h>
+#include <GL/gl.h>
+#endif
 #include <math.h>
 #include "matrix.h"
 #include "stdio.h"
