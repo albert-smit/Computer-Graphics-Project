@@ -4,7 +4,7 @@
 #endif
 #include <GL/glut.h>
 #include "raytracing.h"
-
+#include <limits>
 
 //temporary variables
 Vec3Df testRayOrigin;
