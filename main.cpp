@@ -399,6 +399,7 @@ void keyboard(unsigned char key, int x, int y)
 		
 
 		result.writeImage("result.ppm");
+		cout<<"Done"<<endl;
 		break;
 	}
 	case 27:     // touche ESC
