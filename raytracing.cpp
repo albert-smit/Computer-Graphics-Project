@@ -130,7 +130,6 @@ float rayIntersectsTriangle(const float *p, const float *d,
 }
 
 
-
 //check if a point is shaded i.e. no direct light
 bool shadow(Vec3Df origin, Vec3Df dest)
 {
@@ -385,12 +384,45 @@ Vec3Df getTriangleColour(int i, Vec3Df ray, Vec3Df origin)
 			}
 			
 		}//end of the reflection part
-		
+        
+        //refraction for transparent objects
+            
+        //variable to check if the light goes in or out the transparent object
+        float inOut = Vec3Df::dotProduct(normal, ray);
+            
+        //when inOut < 0 the light goes into the sphere
+        if(inOut < 0){
+            
+            //the fraction coefficient for glass
+            float fractionCoGlass = 0.66;
+                
+            //calculate the the ray inside the object
+            float dotPro = Vec3Df::dotProduct(normal, -vertexPos);
+            float partUnderRoot = sqrtf(1-fractionCoGlass * fractionCoGlass * (1-dotPro*dotPro));
+            if(partUnderRoot > 0){
+                Vec3Df RayInside = (fractionCoGlass * dotPro - partUnderRoot) * normal - (fractionCoGlass * -ray);
+            }
+            // else the light goes out the sphere
+        }else{
+            
+            //the fraction coefficient for glass
+            float fractionCoGlass = 0.66;
+            
+            //calculate the the ray inside the object
+            float dotPro = Vec3Df::dotProduct(-normal, -ray);
+            float partUnderRoot = sqrtf(1-fractionCoGlass * fractionCoGlass * (1-dotPro*dotPro));
+            if(partUnderRoot > 0){
+                Vec3Df RayOutside = (fractionCoGlass * dotPro - partUnderRoot) * normal - (fractionCoGlass * -ray);
+            }
+        // end refraction
+
 		result += result2; 
 	}
 
 	return result;
 }
+
+
 
 //type for bounding box
 class Ray
