@@ -235,13 +235,13 @@ Vec3Df getTriangleColour(int i, Vec3Df ray)
 			result2 *= shadowdepth;
 		}
         
-        //if (Vec3Df::dotProduct(ray,normal) > 0) {
-        //    Vec3Df r = ray - 2 * Vec3Df::dotProduct(normal, ray) * normal;
-        //    r.normalize();
-        //
-        //   result2 += MyMesh.materials.at(triMat).Ks() * pow(Vec3Df::dotProduct(ray,r), s);
-        //
-        //}
+        if (Vec3Df::dotProduct(lightvector,normal) > 0) {
+            Vec3Df r = lightvector - 2 * Vec3Df::dotProduct(normal, lightvector) * normal;
+            r.normalize();
+       
+           result2 += MyMesh.materials.at(triMat).Ks() * pow(Vec3Df::dotProduct(cameravector,r), s);
+       
+        }
 
 
 		result += result2; 
