@@ -462,9 +462,7 @@ public:
 };
 
 
-//the main function here
-//return the color of your pixel.
-Vec3Df performRayTracing(const Vec3Df & origin, const Vec3Df & dest)
+Vec3Df performRayTracing2(const Vec3Df & origin, const Vec3Df & dest)
 {
 	//create ray and bounding box
 	Ray<float> ray1(origin, dest);
@@ -521,6 +519,35 @@ Vec3Df performRayTracing(const Vec3Df & origin, const Vec3Df & dest)
 
 	return Vec3Df(0, 0, 0);
 
+}
+
+//the main function here
+//return the color of your pixel.
+Vec3Df performRayTracing(const Vec3Df & origin, const Vec3Df & dest)
+{
+	//the number of samples for each pixel
+	int samples = 4;
+	Vec3Df result = Vec3Df(0, 0, 0);
+
+	//debug 
+	//std::cout<<"tracing to "<<dest.p[0]<<","<<dest.p[1]<<","<<dest.p[2]<<std::endl;
+
+
+	//supersampling
+	for(int i =0 ;i< samples; i++){
+		//calculate the new destination
+		Vec3Df newDest = dest;
+		float offset = i/10000;
+		newDest += Vec3Df(offset, offset, offset);
+		result += performRayTracing2(origin, newDest);
+
+	}
+	//take the average of the readings for each rgb coordinate
+	result.p[0] = result.p[0]/samples;
+	result.p[1] = result.p[1]/samples;
+	result.p[2] = result.p[2]/samples;
+
+	return result;
 }
 
 
