@@ -337,7 +337,7 @@ Vec3Df getReflection(Vec3Df cameraPos, Vec3Df selectedPos, Vec3Df normal, int cu
 
 			//t < 0 means no intersect
 			//0.0001 because slight noise filtering
-			if (t > 0)
+			if (t > 0.0001)
 			{
 				//closest triangle
 				if (mindistance > t)
