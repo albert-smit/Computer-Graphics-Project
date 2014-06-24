@@ -599,22 +599,29 @@ Vec3Df performRayTracing(const Vec3Df & origin, const Vec3Df & dest)
     Vec3Df vX = Vec3Df(-rayvector[1],rayvector[0],rayvector[2]);
     vX.normalize();
     vX *= sampleDistance;
-
-
     
     Vec3Df vY = Vec3Df(-rayvector[2], rayvector[1], rayvector[0]);
     vY.normalize();
     vY *= sampleDistance;
 
-    //take center of pixel
+    //take center of pixel, this is our first sample
     Vec3Df result = performSubRayTracing(origin, dest);
 
     // calculate starting point
     Vec3Df newOrigin = origin - vX - vY;
     Vec3Df newDest = dest - vX - vY;
 
-    Vec3Df xStep = vX;
-    Vec3Df yStep = vY;
+    //calculate step size
+    float range = 2 * sampleDistance;
+    float stepSize = range / samples;
+
+
+    Vec3Df xStep = vX * stepSize;
+    Vec3Df yStep = vY * stepSize;
+
+    //debug prints
+
+    //std::cout << " stepSize: " << stepSize << std::endl;
 
     for (int i = 0; i< samples; i++) {
     	// move in x
@@ -634,11 +641,11 @@ Vec3Df performRayTracing(const Vec3Df & origin, const Vec3Df & dest)
     
 
     //Get the color of every new ray and divide by the number of rays.
-    Vec3Df resultTotal = 	performSubRayTracing(origin, dest) + 
-    						performSubRayTracing(origin + vX, dest + vX) + 
-    						performSubRayTracing(origin - vX, dest - vX) + 
-    						performSubRayTracing(origin + vY, dest + vY) + 
-    						performSubRayTracing(origin - vY, dest - vY);
+    //Vec3Df resultTotal = 	performSubRayTracing(origin, dest) + 
+    //						performSubRayTracing(origin + vX, dest + vX) + 
+    //						performSubRayTracing(origin - vX, dest - vX) + 
+    //						performSubRayTracing(origin + vY, dest + vY) + 
+    //						performSubRayTracing(origin - vY, dest - vY);
 
     int totalSamples = pow(samples, 2) + 1;
     return result / totalSamples;
