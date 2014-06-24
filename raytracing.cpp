@@ -26,7 +26,7 @@ Vec3Df bmax;
 //Turn features on/off
 const bool shadowFlag = true;
 const bool reflectionFlag = true;
-const bool refractionFlag = true;
+const bool transparencyFlag = true;
 const bool blinnPhongFlag = true;
 const bool diffuseFlag = true;
 
@@ -75,7 +75,7 @@ void init()
 	//feel free to replace cube by a path to another model
 	//please realize that not all OBJ files will successfully load.
 	//Nonetheless, if they come from Blender, they should.
-	MyMesh.loadMesh("/Users/stephandumasy/Documents/cgprac/Computer-Graphics-Project/objects/town.obj", true);
+	MyMesh.loadMesh("objects/town.obj", true);
 	MyMesh.computeVertexNormals();
 
 	//one first move: initialize the first light source
@@ -184,7 +184,7 @@ Vec3Df shadow(Vec3Df origin, Vec3Df dest, Vec3Df currentColour)
 			float matTransparancy = MyMesh.materials.at(triMat).Tr();
 			float shadowdepth = 0.2;
 
-			// 1 = non-transparent, 0 = fully transparent
+			// 1 = opaque, 0 = fully transparent
 			if (matTransparancy > 0 && matTransparancy <= 1) {
 				Vec3Df matColour = MyMesh.materials.at(triMat).Kd();
 				shadowResult = (1 / matTransparancy) * shadowdepth;
@@ -230,7 +230,7 @@ float getDiffusion(Vec3Df normal, Vec3Df lightvector) {
 
 
 //function that gets the colour of reflection ray
-//essentially a copy of getTriangleColour without reflections
+//called by getReflection()
 Vec3Df getReflectionColour(int triangleind, Vec3Df ray, Vec3Df origin, int currentLightPos, Vec3Df brightness)
 {
 	Vec3Df result = Vec3Df(0, 0, 0);
@@ -294,6 +294,7 @@ Vec3Df getReflectionColour(int triangleind, Vec3Df ray, Vec3Df origin, int curre
 	return result;
 }
 
+//calculate reflection, calls getReflectionColour() too
 Vec3Df getReflection(Vec3Df cameraPos, Vec3Df selectedPos, Vec3Df normal, int currentLightPos, Vec3Df currentResult) {
 	Vec3Df reflectionColour = Vec3Df(0, 0, 0);
 	//"camera" vector to origin
@@ -358,71 +359,6 @@ Vec3Df getReflection(Vec3Df cameraPos, Vec3Df selectedPos, Vec3Df normal, int cu
 	return reflectionColour;
 }
 
-Vec3Df getRefraction2(Vec3Df cameraPos, Vec3Df selectedPos, Vec3Df normal, int currentLightPos, Vec3Df currentResult) {
-	Vec3Df reflectionColour = Vec3Df(0, 0, 0);
-	//"camera" vector to origin
-	Vec3Df V = cameraPos - selectedPos;
-	V.normalize();
-
-	float cosalpha = Vec3Df::dotProduct(V, normal);
-
-	//FOR REFLECTION
-	//if "camera" is on wrong side of surface (normal pointing other way, over 90 degrees) then cosalpha < 0
-	if (cosalpha > 0) {
-		Vec3Df r = ((2 * cosalpha) * normal) - V;
-		r.normalize();
-
-		//this will be the intersection point of reflection vector
-		Vec3Df intersect;
-		float mindistance = 10000;
-		int triangleind = -1;
-
-		Vec3Df reflray;
-
-		Vec3Df p = selectedPos;
-		Vec3Df d = r;
-
-		//find closest triangle by looping through all
-		for (int o = 0; o < MyMesh.triangles.size(); o++){
-
-			float *v0 = MyMesh.vertices[MyMesh.triangles[o].v[0]].p.p;
-			float *v1 = MyMesh.vertices[MyMesh.triangles[o].v[1]].p.p;
-			float *v2 = MyMesh.vertices[MyMesh.triangles[o].v[2]].p.p;
-
-			float t = getTriangleIntersection(p, d, v0, v1, v2, &intersect);
-
-			//t < 0 means no intersect
-			//0.0001 because slight noise filtering
-			if (t > 0.0001)
-			{
-				//closest triangle
-				if (mindistance > t)
-				{
-					reflray = intersect;
-					mindistance = t;
-					triangleind = o;
-				}
-			}
-
-
-		}
-
-		//if there was an intersection with a triangle
-		if (triangleind >= 0)
-		{
-			reflectionColour = getReflectionColour(triangleind, reflray, selectedPos, currentLightPos, currentResult);
-
-			////get colour of material
-			unsigned int triMatr = MyMesh.triangleMaterials.at(triangleind);
-			Vec3Df colr = MyMesh.materials.at(triMatr).Ks();
-			reflectionColour *= colr;
-		}
-
-	}//end of the reflection part
-	return reflectionColour;
-}
-
-
 //called when ray from origin intersects a triangle
 //function that gets the colour
 Vec3Df getTriangleColour(int i, Vec3Df ray, Vec3Df origin, Vec3Df dest, std::priority_queue<node*> distances)
@@ -454,7 +390,7 @@ Vec3Df getTriangleColour(int i, Vec3Df ray, Vec3Df origin, Vec3Df dest, std::pri
 	float blinnPhongResult = 0;
 	float diffuseResult = 0;
 	Vec3Df reflectionResult = Vec3Df(0, 0, 0);
-	Vec3Df refractionResult = Vec3Df(0, 0, 0);
+	Vec3Df transparencyResult = Vec3Df(0, 0, 0);
 
 
 
@@ -484,9 +420,8 @@ Vec3Df getTriangleColour(int i, Vec3Df ray, Vec3Df origin, Vec3Df dest, std::pri
 			result2 += col * diffuseResult;
 		}
 
-		//refraction for transparent objects
-		if (refractionFlag) {
-			//refractionResult = getRefraction(dest, ray);
+		//transparency for transparent objects
+		if (transparencyFlag) {
 			unsigned int triMat = MyMesh.triangleMaterials.at(i);
 			float matTransparancy = MyMesh.materials.at(triMat).Tr();
 			if (distances.size() > 1 && matTransparancy < 1) {
@@ -495,9 +430,9 @@ Vec3Df getTriangleColour(int i, Vec3Df ray, Vec3Df origin, Vec3Df dest, std::pri
 				int triangleId = secondTriangle->triangle;
 
 				unsigned int triMat = MyMesh.triangleMaterials.at(triangleId);
-				Vec3Df refractionResult = matTransparancy * MyMesh.materials.at(triMat).Kd();
+				Vec3Df transparencyResult = matTransparancy * MyMesh.materials.at(triMat).Kd();
 				Vec3Df colr = MyMesh.materials.at(triMat).Ks();
-				result2 = (1 - matTransparancy) * result2 + refractionResult*colr;
+				result2 = (1 - matTransparancy) * result2 + transparencyResult*colr;
 			}
 		}
 
@@ -506,7 +441,7 @@ Vec3Df getTriangleColour(int i, Vec3Df ray, Vec3Df origin, Vec3Df dest, std::pri
 			result2 = shadow(ray, MyLightPositions[j], result2);
 		}
 
-
+		//check for reflections
 		if (reflectionFlag) {
 			reflectionResult = getReflection(origin, ray, normal, j, result2);
 
@@ -518,30 +453,6 @@ Vec3Df getTriangleColour(int i, Vec3Df ray, Vec3Df origin, Vec3Df dest, std::pri
 
 	return result;
 }
-
-
-
-//type for bounding box
-class Ray
-{
-public:
-	Ray(Vec3Df orig, Vec3Df dir) : orig(orig),
-		dir(dir),
-		tmin(float(0)),
-		tmax(std::numeric_limits<float>::max())
-	{
-		invdir[0] = float(1) / dir[0];
-		invdir[1] = float(1) / dir[1];
-		invdir[2] = float(1) / dir[2];
-		sign[0] = (invdir[0] < 0);
-		sign[1] = (invdir[1] < 0);
-		sign[2] = (invdir[2] < 0);
-	}
-	Vec3D<float> orig, dir; /// ray orig and dir 
-	mutable float tmin, tmax; /// ray min and max distances 
-	Vec3D<float> invdir;
-	int sign[3];
-};
 
 //bounding box intersection test
 bool rayBoxIntersect(const Vec3Df & origin, const Vec3Df & dest)
@@ -642,7 +553,6 @@ Vec3Df performSubRayTracing(const Vec3Df & origin, const Vec3Df & dest)
 
 	//find closest triangle by looping through all
 	std::priority_queue<node*> distances;
-	//std::priority_queue<float, std::vector<float>, std::greater<float>> distances;
 
 	for (int i = 0; i < MyMesh.triangles.size(); i++){
 
@@ -700,6 +610,7 @@ Vec3Df performRayTracing(const Vec3Df & origin, const Vec3Df & dest)
 	vY.normalize();
 	vY *= sampleDistance;
 
+	//supersampling
 	//Get the color of every new ray and divide by the number of rays.
 	Vec3Df resultTotal = performSubRayTracing(origin, dest) + performSubRayTracing(origin + vX, dest + vX) + performSubRayTracing(origin - vX, dest - vX) + performSubRayTracing(origin + vY, dest + vY) + performSubRayTracing(origin - vY, dest - vY);
 
