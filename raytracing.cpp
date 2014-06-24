@@ -522,42 +522,41 @@ public:
 	}
 };
 
-
-Vec3Df performRayTracing2(const Vec3Df & origin, const Vec3Df & dest)
+Vec3Df performSubRayTracing(const Vec3Df & origin, const Vec3Df & dest)
 {
 	//create ray and bounding box
 	Ray ray1(origin, dest);
 	Box box(bmin, bmax);
-
+    
 	//if the ray doesn't intersect the box, return colour (default black, change to something else for debugging bounding box)
 	if (!(box.intersect(ray1)))
 	{
 		return Vec3Df(0, 0, 0);
 	}
-
+    
 	//initialise to far, this float determines closest distance to origin
 	float mindistance = 10000;
-
+    
 	//index of triangle in mesh
 	int triangleind = -1;
-
+    
 	//used to get vertexPos, intersection point on triangle
 	Vec3Df ray;
-
+    
 	Vec3Df intersect;
-
+    
 	const float *p = origin.p;
 	const float *d = dest.p;
-
+    
 	//find closest triangle by looping through all
 	for (int i = 0; i < MyMesh.triangles.size(); i++){
-
+        
 		float *v0 = MyMesh.vertices[MyMesh.triangles[i].v[0]].p.p;
 		float *v1 = MyMesh.vertices[MyMesh.triangles[i].v[1]].p.p;
 		float *v2 = MyMesh.vertices[MyMesh.triangles[i].v[2]].p.p;
-
+        
 		float t = rayIntersectsTriangle(p, d, v0, v1, v2, &intersect);
-
+        
 		//t < 0 means no intersect
 		if (t >= 0)
 		{
@@ -570,49 +569,41 @@ Vec3Df performRayTracing2(const Vec3Df & origin, const Vec3Df & dest)
 			}
 		}
 	}
-
-
+    
+    
 	//if there was an intersection with a triangle
 	if (triangleind >= 0)
 	{
 		return getTriangleColour(triangleind, ray, origin);
 	}
-
+    
 	return Vec3Df(0, 0, 0);
-
+    
 }
 
 //the main function here
 //return the color of your pixel.
 Vec3Df performRayTracing(const Vec3Df & origin, const Vec3Df & dest)
 {
-	//the number of samples for each pixel
-	int samples = 4;
-	Vec3Df result = Vec3Df(0, 0, 0);
+    std::vector<Vec3Df> subsamples;
 
-	//debug 
-	//std::cout<<"tracing to "<<dest.p[0]<<","<<dest.p[1]<<","<<dest.p[2]<<std::endl;
-
-
-	//supersampling
-	for(int i =0 ;i< samples; i++){
-		Vec3Df newDest = dest;
-		newDest += Vec3Df(i/1000,0,0);
-		for(int j =0 ;j< samples; j++){
-			newDest += Vec3Df(0, i/1000,0);
-			result += performRayTracing2(origin, newDest);
-
-		}
-		
-	}
-	//take the average of the readings for each rgb coordinate
-	result.p[0] = result.p[0]/(samples* samples);
-	result.p[1] = result.p[1]/(samples * samples);
-	result.p[2] = result.p[2]/(samples * samples);
-	
-	return result;
-	
-	//return performRayTracing2(origin, dest);
+    float sampleDistance = 0.002;
+    
+    Vec3Df rayvector = origin - dest;
+    
+    Vec3Df vX = Vec3Df(-rayvector[1],rayvector[0],rayvector[2]);
+    vX.normalize();
+    vX *= sampleDistance;
+    
+    Vec3Df vY = Vec3Df(-rayvector[2], rayvector[1], rayvector[0]);
+    vY.normalize();
+    vY *= sampleDistance;
+    
+    Vec3Df resultTotal = performSubRayTracing(origin, dest) + performSubRayTracing(origin + vX, dest + vX) + performSubRayTracing(origin - vX, dest - vX) + performSubRayTracing(origin + vY, dest + vY) + performSubRayTracing(origin - vY, dest - vY);
+    
+    return resultTotal / 5;
+    
+    
 }
 
 
