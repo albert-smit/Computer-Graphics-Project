@@ -389,14 +389,6 @@ void keyboard(unsigned char key, int x, int y)
 		for (unsigned int y=0; y<WindowSize_Y;++y)
 			for (unsigned int x=0; x<WindowSize_X;++x)
 			{
-				int progress = 0;
-				int percentage = 0;
-				if (progress >= 8) {
-					progress = 0;
-					std::cout << percentage++ << "%% done" << std::endl; 
-				}
-				progress++;
-				
 				//svp, decidez vous memes quels parametres vous allez passer Ela fonction
 				//e.g., maillage, triangles, sphères etc.
 				float xscale=1.0f-float(x)/(WindowSize_X-1);
