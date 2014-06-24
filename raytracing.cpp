@@ -354,11 +354,12 @@ Vec3Df getReflection(Vec3Df cameraPos, Vec3Df selectedPos, Vec3Df normal, int cu
 		//if there was an intersection with a triangle
 		if (triangleind >= 0)
 		{
-			reflectionColour = getReflectionColour(triangleind, intersect, reflray, currentLightPos, currentResult);
+			reflectionColour = getReflectionColour(triangleind, reflray, selectedPos, currentLightPos, currentResult);
 
 			////get colour of material
 			unsigned int triMatr = MyMesh.triangleMaterials.at(triangleind);
-			Vec3Df colr = MyMesh.materials.at(triMatr).Ks() * 0.1;
+			Vec3Df colr = MyMesh.materials.at(triMatr).Ks() * 0.5;
+            reflectionColour *= colr;
 		}
 
 	}//end of the reflection part
