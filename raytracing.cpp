@@ -63,7 +63,7 @@ void init()
 	//feel free to replace cube by a path to another model
 	//please realize that not all OBJ files will successfully load.
 	//Nonetheless, if they come from Blender, they should.
-	MyMesh.loadMesh("/Users/stephandumasy/Documents/cgprac/Computer-Graphics-Project/objects/glass.obj", true);
+	MyMesh.loadMesh("C:/Users/Vlad/Desktop/raytracing/objects/reflection.obj", true);
 	MyMesh.computeVertexNormals();
 
 	//one first move: initialize the first light source
@@ -75,66 +75,72 @@ void init()
 	boundingBox();
 }
 
-/* a = b - c */
-#define vector(a,b,c) \
-	(a)[0] = (b)[0] - (c)[0];	\
-	(a)[1] = (b)[1] - (c)[1];	\
-	(a)[2] = (b)[2] - (c)[2];
-
-#define crossProduct0(a,b,c) \
-(a)[0] = (b)[1] * (c)[2] - (c)[1] * (b)[2]; \
-(a)[1] = (b)[2] * (c)[0] - (c)[2] * (b)[0]; \
-(a)[2] = (b)[0] * (c)[1] - (c)[0] * (b)[1];
-
-#define innerProduct(v,q) \
-((v)[0] * (q)[0] + \
-	(v)[1] * (q)[1] + \
-	(v)[2] * (q)[2])
-
 //check if a ray intersects a triangle, 
 //intersect returns the intersection point
-float rayIntersectsTriangle(const float *p, const float *d,
-	const float *v0, const float *v1, const float *v2, Vec3Df* intersect) {
+//output is distance to point
+//Moller & Trumbore method
+float getTriangleIntersection(Vec3Df p, Vec3Df d, const float *v0, const float *v1, const float *v2, Vec3Df* intersect) {
 
-	float e1[3], e2[3], h[3], s[3], q[3];
-	float a, f, u, v;
-	vector(e1, v1, v0);
-	vector(e2, v2, v0);
+	float det, invdet, u, v;
+	Vec3Df edge1, edge2, pvec, qvec, tvec;
 
-	crossProduct0(h, d, e2);
-	a = innerProduct(e1, h);
+	//edge 1
+	edge1[0] = v1[0] - v0[0];
+	edge1[1] = v1[1] - v0[1];
+	edge1[2] = v1[2] - v0[2];
 
-	//if (a > -0.00001 && a < 0.00001)
-	if (a == 0)
-		return(-1);
+	//edge 2
+	edge2[0] = v2[0] - v0[0];
+	edge2[1] = v2[1] - v0[1];
+	edge2[2] = v2[2] - v0[2];
 
-	f = 1 / a;
-	vector(s, p, v0);
-	u = f * (innerProduct(s, h));
+	//v0 to origin
+	tvec[0] = p[0] - v0[0];
+	tvec[1] = p[1] - v0[1];
+	tvec[2] = p[2] - v0[2];
 
-	if (u < 0.0 || u > 1.0)
-		return(-1);
+	pvec = Vec3Df::crossProduct(d, edge2);
 
-	crossProduct0(q, s, e1);
-	v = f * innerProduct(d, q);
+	//determinant
+	det = Vec3Df::dotProduct(edge1, pvec);
 
-	if (v < 0.0 || u + v > 1.0)
-		return(-1);
-
-	// at this stage we can compute t to find out where
-	// the intersection point is on the line
-	float t = f * innerProduct(e2, q);
-
-	if (t > 0) // ray intersection
+	//doesn't lie in plane of triangle
+	if (det == 0)
 	{
-
-		*intersect = (1 - u - v)*Vec3Df(v0[0], v0[1], v0[2]) + u*Vec3Df(v1[0], v1[1], v1[2]) + v*Vec3Df(v2[0], v2[1], v2[2]); // intersect point of ray and triangle
-		return(t);
+		return -1;
 	}
 
-	else // this means that there is a line intersection
-		// but not a ray intersection
-		return (-1);
+	invdet = 1 / det;
+	u = invdet * (Vec3Df::dotProduct(tvec, pvec));
+
+	//test u bounds
+	if (u < 0.0 || u > 1.0)
+	{
+		return -1;
+	}
+
+	qvec = Vec3Df::crossProduct(tvec, edge1);
+	v = invdet * Vec3Df::dotProduct(d, qvec);
+
+	//test v bounds
+	if (v < 0.0 || u + v > 1.0)
+	{
+		return -1;
+	}
+
+	//find distance to intersection point
+	float t = invdet * Vec3Df::dotProduct(edge2, qvec);
+
+	if (t > 0) 
+	{
+		//point of intersection
+		*intersect = (1 - u - v)*Vec3Df(v0[0], v0[1], v0[2]) + u*Vec3Df(v1[0], v1[1], v1[2]) + v*Vec3Df(v2[0], v2[1], v2[2]);
+		return t;
+	}
+	else
+	{
+		return -1;
+	}
 
 }
 
@@ -153,7 +159,7 @@ bool shadow(Vec3Df origin, Vec3Df dest)
 		float *v1 = MyMesh.vertices[MyMesh.triangles[i].v[1]].p.p;
 		float *v2 = MyMesh.vertices[MyMesh.triangles[i].v[2]].p.p;
 
-		float t = rayIntersectsTriangle(p, d, v0, v1, v2, &intersect);
+		float t = getTriangleIntersection(p, d, v0, v1, v2, &intersect);
 
 		//intersect means above 0, rest is to filter out noise
 		if (t > 0.0001)
@@ -212,9 +218,9 @@ float getDiffusion(Vec3Df normal, Vec3Df lightvector) {
             
             Vec3Df reflray;
             
-            const float *p = ray.p;
+            Vec3Df p = ray;
             
-            const float *d = normal.p;
+            Vec3Df d = normal;
             
             //find closest triangle by looping through all
             
@@ -224,7 +230,7 @@ float getDiffusion(Vec3Df normal, Vec3Df lightvector) {
                 float *v0 = MyMesh.vertices[MyMesh.triangles[o].v[0]].p.p;
                 float *v1 = MyMesh.vertices[MyMesh.triangles[o].v[1]].p.p;
                 float *v2 = MyMesh.vertices[MyMesh.triangles[o].v[2]].p.p;
-                float t = rayIntersectsTriangle(p, d, v0, v1, v2, &intersect);
+				float t = getTriangleIntersection(p, d, v0, v1, v2, &intersect);
   
                 //t < 0 means no intersect
                 
@@ -424,8 +430,8 @@ Vec3Df getReflection(Vec3Df cameraPos, Vec3Df selectedPos, Vec3Df normal, int cu
 
 		Vec3Df reflray;
 
-		const float *p = selectedPos.p;
-		const float *d = r.p;
+		Vec3Df p = selectedPos;
+		Vec3Df d = r;
 
 		//find closest triangle by looping through all
 		for (int o = 0; o < MyMesh.triangles.size(); o++){
@@ -434,7 +440,7 @@ Vec3Df getReflection(Vec3Df cameraPos, Vec3Df selectedPos, Vec3Df normal, int cu
 			float *v1 = MyMesh.vertices[MyMesh.triangles[o].v[1]].p.p;
 			float *v2 = MyMesh.vertices[MyMesh.triangles[o].v[2]].p.p;
 
-			float t = rayIntersectsTriangle(p, d, v0, v1, v2, &intersect);
+			float t = getTriangleIntersection(p, d, v0, v1, v2, &intersect);
 
 			//t < 0 means no intersect
 			//0.0001 because slight noise filtering
@@ -648,8 +654,8 @@ Vec3Df performSubRayTracing(const Vec3Df & origin, const Vec3Df & dest)
     
 	Vec3Df intersect;
     
-	const float *p = origin.p;
-	const float *d = dest.p;
+	Vec3Df p = origin;
+	Vec3Df d = dest;
     
 	//find closest triangle by looping through all
 	for (int i = 0; i < MyMesh.triangles.size(); i++){
@@ -658,7 +664,7 @@ Vec3Df performSubRayTracing(const Vec3Df & origin, const Vec3Df & dest)
 		float *v1 = MyMesh.vertices[MyMesh.triangles[i].v[1]].p.p;
 		float *v2 = MyMesh.vertices[MyMesh.triangles[i].v[2]].p.p;
         
-		float t = rayIntersectsTriangle(p, d, v0, v1, v2, &intersect);
+		float t = getTriangleIntersection(p, d, v0, v1, v2, &intersect);
         
 		//t < 0 means no intersect
 		if (t >= 0)
