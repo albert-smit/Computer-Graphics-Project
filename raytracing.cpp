@@ -257,7 +257,7 @@ Vec3Df getReflectionColour(int triangleind, Vec3Df ray, Vec3Df origin, int curre
 
 	//get colour of material
 	unsigned int triMat = MyMesh.triangleMaterials.at(triangleind);
-	Vec3Df col = MyMesh.materials.at(triMat).Kd() * 0.5;
+	Vec3Df col = MyMesh.materials.at(triMat).Kd();
 
 	float blinnPhongResult = 0;
 	float diffuseResult = 0;
@@ -358,7 +358,7 @@ Vec3Df getReflection(Vec3Df cameraPos, Vec3Df selectedPos, Vec3Df normal, int cu
 
 			////get colour of material
 			unsigned int triMatr = MyMesh.triangleMaterials.at(triangleind);
-			Vec3Df colr = MyMesh.materials.at(triMatr).Ks() * 0.5;
+			Vec3Df colr = MyMesh.materials.at(triMatr).Ks();
             reflectionColour *= colr;
 		}
 
@@ -392,7 +392,7 @@ Vec3Df getTriangleColour(int i, Vec3Df ray, Vec3Df origin)
 
 	//get colour of material
 	unsigned int triMat = MyMesh.triangleMaterials.at(i);
-	Vec3Df col = MyMesh.materials.at(triMat).Kd() * 0.5;
+	Vec3Df col = MyMesh.materials.at(triMat).Kd();
 
 	float blinnPhongResult = 0;
 	float diffuseResult = 0;
@@ -585,12 +585,13 @@ Vec3Df performSubRayTracing(const Vec3Df & origin, const Vec3Df & dest)
 //return the color of your pixel.
 Vec3Df performRayTracing(const Vec3Df & origin, const Vec3Df & dest)
 {
-    std::vector<Vec3Df> subsamples;
-
-    float sampleDistance = 0.002;
+    //Distance between the pixels
+    float sampleDistance = 0.0041;
     
+    //Determine the direction of the ray
     Vec3Df rayvector = origin - dest;
     
+    //Get the orthogonal of the ray and normalize it with the pixel distance
     Vec3Df vX = Vec3Df(-rayvector[1],rayvector[0],rayvector[2]);
     vX.normalize();
     vX *= sampleDistance;
@@ -599,6 +600,7 @@ Vec3Df performRayTracing(const Vec3Df & origin, const Vec3Df & dest)
     vY.normalize();
     vY *= sampleDistance;
     
+    //Get the color of every new ray and divide by the number of rays.
     Vec3Df resultTotal = performSubRayTracing(origin, dest) + performSubRayTracing(origin + vX, dest + vX) + performSubRayTracing(origin - vX, dest - vX) + performSubRayTracing(origin + vY, dest + vY) + performSubRayTracing(origin - vY, dest - vY);
     
     return resultTotal / 5;
