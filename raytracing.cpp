@@ -24,9 +24,11 @@ Vec3Df bmax;
 //Turn features on/off
 const bool shadowFlag = true;
 const bool reflectionFlag = true;
-const bool refractionFlag = true;
+const bool refractionFlag = false;
 const bool blinnPhongFlag = true;
 const bool diffuseFlag = true;
+
+Vec3Df getTriangleColour(int, Vec3Df, Vec3Df);
 
 void boundingBox()
 {
@@ -61,7 +63,7 @@ void init()
 	//feel free to replace cube by a path to another model
 	//please realize that not all OBJ files will successfully load.
 	//Nonetheless, if they come from Blender, they should.
-	MyMesh.loadMesh("objects/coloredCube.obj", true);
+	MyMesh.loadMesh("/Users/stephandumasy/Documents/cgprac/Computer-Graphics-Project/objects/glass.obj", true);
 	MyMesh.computeVertexNormals();
 
 	//one first move: initialize the first light source
@@ -194,41 +196,140 @@ float getDiffusion(Vec3Df normal, Vec3Df lightvector) {
 	return diffusion;
 }
 
-Vec3Df getRefraction(Vec3Df normal, Vec3Df ray, Vec3Df vertexPos) {
-	Vec3Df result = Vec3Df(0, 0, 0);
 
-	//variable to check if the light goes in or out the transparent object
-	float inOut = Vec3Df::dotProduct(normal, ray);
+    Vec3Df getRefraction(Vec3Df normal, Vec3Df ray, Vec3Df vertexPos, Vec3Df currentLightPos, int i) {
+        
+        Vec3Df result = Vec3Df(0, 0, 0);
+        Vec3Df refractionColour = Vec3Df(0,0,0);
+        unsigned int triMat = MyMesh.triangleMaterials.at(i);
+        if(MyMesh.materials.at(triMat).Tr() < 1){
+            
+            //this will be the intersection point of reflection vector
+            
+            Vec3Df intersect;
+            float mindistance = 10000;
+            int triangleind = -1;
+            
+            Vec3Df reflray;
+            
+            const float *p = ray.p;
+            
+            const float *d = normal.p;
+            
+            //find closest triangle by looping through all
+            
+            for (int o = 0; o < MyMesh.triangles.size(); o++){
+            
+                
+                float *v0 = MyMesh.vertices[MyMesh.triangles[o].v[0]].p.p;
+                float *v1 = MyMesh.vertices[MyMesh.triangles[o].v[1]].p.p;
+                float *v2 = MyMesh.vertices[MyMesh.triangles[o].v[2]].p.p;
+                float t = rayIntersectsTriangle(p, d, v0, v1, v2, &intersect);
+  
+                //t < 0 means no intersect
+                
+                //0.0001 because slight noise filtering
+                
+                if (t > 0.0001)
+                    
+                {
+                    
+                    //closest triangle
+                    
+                    if (mindistance > t)
+                    {
+                        reflray = intersect;
+                        mindistance = t;
+                        triangleind = o;
+                    }
+                    
+                }
+                
+            }
+            //if there was an intersection with a triangle
+            
+            if (triangleind >= 0)
+                
+            {
+                
+                refractionColour = getTriangleColour(triangleind, ray, currentLightPos);
+                
+            }
+  
+            /*
+             
+             //variable to check if the light goes in or out the transparent object
+             
+             float inOut = Vec3Df::dotProduct(normal, ray);
+             
+             
+             
+             //when inOut < 0 the light goes into the sphere
+             
+             if (inOut < 0){
+             
+             
+             
+             //the fraction coefficient for glass
+             
+             float fractionCoGlass = 0.66;
+             
+             
+             
+             //calculate the the ray inside the object
+             
+             float dotPro = Vec3Df::dotProduct(normal, -vertexPos);
+             
+             float partUnderRoot = sqrtf(1 - fractionCoGlass * fractionCoGlass * (1 - dotPro*dotPro));
+             
+             if (partUnderRoot > 0){
+             
+             Vec3Df RayInside = (fractionCoGlass * dotPro - partUnderRoot) * normal - (fractionCoGlass * -ray);
+             
+             }
+             
+             
+             
+             // else the light goes out the sphere
+             
+             }
+             
+             else{
+             
+             
+             
+             //the fraction coefficient for glass
+             
+             float fractionCoGlass = 1.5;
+             
+             
+             
+             //calculate the the ray inside the object
+             
+             float dotPro = Vec3Df::dotProduct(-normal, -ray);
+             
+             float partUnderRoot = sqrtf(1 - fractionCoGlass * fractionCoGlass * (1 - dotPro*dotPro));
+             
+             if (partUnderRoot > 0){
+             
+             Vec3Df RayOutside = (fractionCoGlass * dotPro - partUnderRoot) * normal - (fractionCoGlass * -ray);
+             
+             }
+             
+             } */
+            
+            // end refraction
+            
+        }
+        
+        
+        
+        
+        return refractionColour;
+        
+    
+    
 
-	//when inOut < 0 the light goes into the sphere
-	if (inOut < 0){
-
-		//the fraction coefficient for glass
-		float fractionCoGlass = 0.66;
-
-		//calculate the the ray inside the object
-		float dotPro = Vec3Df::dotProduct(normal, -vertexPos);
-		float partUnderRoot = sqrtf(1 - fractionCoGlass * fractionCoGlass * (1 - dotPro*dotPro));
-		if (partUnderRoot > 0){
-			Vec3Df RayInside = (fractionCoGlass * dotPro - partUnderRoot) * normal - (fractionCoGlass * -ray);
-		}
-		// else the light goes out the sphere
-	}
-	else{
-
-		//the fraction coefficient for glass
-		float fractionCoGlass = 0.66;
-
-		//calculate the the ray inside the object
-		float dotPro = Vec3Df::dotProduct(-normal, -ray);
-		float partUnderRoot = sqrtf(1 - fractionCoGlass * fractionCoGlass * (1 - dotPro*dotPro));
-		if (partUnderRoot > 0){
-			Vec3Df RayOutside = (fractionCoGlass * dotPro - partUnderRoot) * normal - (fractionCoGlass * -ray);
-		}
-	}
-	// end refraction
-
-	return result;
 }
 
 //function that gets the colour of reflection ray
@@ -448,8 +549,10 @@ Vec3Df getTriangleColour(int i, Vec3Df ray, Vec3Df origin)
 
 		//refraction for transparent objects
 		if (refractionFlag) {
-			refractionResult = getRefraction(normal, ray, vertexPos);
-		}
+			refractionResult = getRefraction(normal, ray, vertexPos, lightvector, i);
+            float matTransparancy = MyMesh.materials.at(triMat).Tr();
+            result2 = (1-matTransparancy) * result2 + matTransparancy*refractionResult;
+        }
 
 
 
