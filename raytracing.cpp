@@ -30,7 +30,8 @@ const bool diffuseFlag = true;
 
 Vec3Df getTriangleColour(int, Vec3Df, Vec3Df);
 
-void boundingBox()
+//make the bounding box
+void makeBoundingBox()
 {
 	//initialise variables to something reasonable
 	bmin = Vec3Df(1000, 1000, 1000);
@@ -72,7 +73,7 @@ void init()
 	MyLightPositions.push_back(MyCameraPosition);
 
 	//make a bounding box around the entire model
-	boundingBox();
+	makeBoundingBox();
 }
 
 //check if a ray intersects a triangle, 
@@ -568,79 +569,85 @@ Vec3Df getTriangleColour(int i, Vec3Df ray, Vec3Df origin)
 	return result;
 }
 
-
-
-//type for bounding box
-class Ray
+//bounding box intersection test
+bool rayBoxIntersect(const Vec3Df & origin, const Vec3Df & dest)
 {
-public:
-	Ray(Vec3Df orig, Vec3Df dir) : orig(orig),
-		dir(dir),
-		tmin(float(0)),
-		tmax(std::numeric_limits<float>::max())
-	{
-		invdir[0] = float(1) / dir[0];
-		invdir[1] = float(1) / dir[1];
-		invdir[2] = float(1) / dir[2];
-		sign[0] = (invdir[0] < 0);
-		sign[1] = (invdir[1] < 0);
-		sign[2] = (invdir[2] < 0);
-	}
-	Vec3D<float> orig, dir; /// ray orig and dir 
-	mutable float tmin, tmax; /// ray min and max distances 
-	Vec3D<float> invdir;
-	int sign[3];
-};
+	float min, max;
+	min = bmin[0];
+	max = bmax[0];
 
-//bounding box
-class Box
-{
-public:
-	Box(Vec3D<float> vmin, Vec3D<float> vmax)
-	{
-		bounds[0] = vmin;
-		bounds[1] = vmax;
-	}
-	Vec3D<float> bounds[2];
+	Vec3Df invdest, bounds[2];
+	int xsign, ysign, zsign;
+	float xmin, xmax, ymin, ymax, zmin, zmax;
 
-	bool intersect(const Ray &r) const {
-		float tmin, tmax, tymin, tymax, tzmin, tzmax;
-		tmin = (bounds[r.sign[0]][0] - r.orig[0]) * r.invdir[0];
-		tmax = (bounds[1 - r.sign[0]][0] - r.orig[0]) * r.invdir[0];
-		tymin = (bounds[r.sign[1]][1] - r.orig[1]) * r.invdir[1];
-		tymax = (bounds[1 - r.sign[1]][1] - r.orig[1]) * r.invdir[1];
-		if ((tmin > tymax) || (tymin > tmax))
-			return false;
-		if (tymin > tmin)
-			tmin = tymin;
-		if (tymax < tmax)
-			tmax = tymax;
-		tzmin = (bounds[r.sign[2]][2] - r.orig[2]) * r.invdir[2];
-		tzmax = (bounds[1 - r.sign[2]][2] - r.orig[2]) * r.invdir[2];
-		if ((tmin > tzmax) || (tzmin > tmax))
-			return false;
-		if (tzmin > tmin)
-			tmin = tzmin;
-		if (tzmax < tmax)
-			tmax = tzmax;
-		if (tmin > r.tmin)
-			r.tmin = tmin;
-		if (tmax < r.tmax)
-			r.tmax = tmax;
-		return true;
+	bounds[0] = bmin;
+	bounds[1] = bmax;
+
+	invdest[0] = 1 / dest[0];
+	invdest[1] = 1 / dest[1];
+	invdest[2] = 1 / dest[2];
+
+	xsign = (invdest[0] < 0);
+	ysign = (invdest[1] < 0);
+	zsign = (invdest[2] < 0);
+
+	xmin = (bounds[xsign][0] - origin[0]) * invdest[0];
+	xmax = (bounds[1 - xsign][0] - origin[0]) * invdest[0];
+	ymin = (bounds[ysign][1] - origin[1]) * invdest[1];
+	ymax = (bounds[1 - ysign][1] - origin[1]) * invdest[1];
+	zmin = (bounds[zsign][2] - origin[2]) * invdest[2];
+	zmax = (bounds[1 - zsign][2] - origin[2]) * invdest[2];
+
+	if ((xmin > ymax) || (ymin > xmax))
+	{
+		return false;
 	}
-};
+
+	if (ymin > xmin)
+	{
+		xmin = ymin;
+	}
+
+	if (ymax < xmax)
+	{
+		xmax = ymax;
+	}
+
+	if ((xmin > zmax) || (zmin > xmax))
+	{
+		return false;
+	}
+
+	if (zmin > xmin)
+	{
+		xmin = zmin;
+	}
+
+	if (zmax < xmax)
+	{
+		xmax = zmax;
+	}
+
+	if (xmin > min)
+	{
+		min = xmin;
+	}
+
+	if (xmax < max)
+	{
+		max = xmax;
+	}
+
+	return true;
+}
 
 Vec3Df performSubRayTracing(const Vec3Df & origin, const Vec3Df & dest)
 {
-	//create ray and bounding box
-	Ray ray1(origin, dest);
-	Box box(bmin, bmax);
     
 	//if the ray doesn't intersect the box, return colour (default black, change to something else for debugging bounding box)
-	if (!(box.intersect(ray1)))
+	if (!rayBoxIntersect(origin, dest))
 	{
-		return Vec3Df(0, 0, 0);
+		return Vec3Df(1, 0, 0);
 	}
     
 	//initialise to far, this float determines closest distance to origin
