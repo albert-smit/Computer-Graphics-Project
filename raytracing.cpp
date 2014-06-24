@@ -595,19 +595,23 @@ Vec3Df performRayTracing(const Vec3Df & origin, const Vec3Df & dest)
 
 	//supersampling
 	for(int i =0 ;i< samples; i++){
-		//calculate the new destination
 		Vec3Df newDest = dest;
-		float offset = i/10000;
-		newDest += Vec3Df(offset, offset, offset);
-		result += performRayTracing2(origin, newDest);
+		newDest += Vec3Df(i/1000,0,0);
+		for(int j =0 ;j< samples; j++){
+			newDest += Vec3Df(0, i/1000,0);
+			result += performRayTracing2(origin, newDest);
 
+		}
+		
 	}
 	//take the average of the readings for each rgb coordinate
-	result.p[0] = result.p[0]/samples;
-	result.p[1] = result.p[1]/samples;
-	result.p[2] = result.p[2]/samples;
-
+	result.p[0] = result.p[0]/(samples* samples);
+	result.p[1] = result.p[1]/(samples * samples);
+	result.p[2] = result.p[2]/(samples * samples);
+	
 	return result;
+	
+	//return performRayTracing2(origin, dest);
 }
 
 
